@@ -53,19 +53,32 @@ The `compat` feature provides a complete libzstd-compatible C API. Same function
 - `ZSTD_isError`, `ZSTD_getErrorName`
 - Dictionary support, streaming, parameter setting, context reset
 
-**Pre-built binaries** are on the [Releases](https://github.com/GodlessVVanderer/zyzyr/releases) page — download `zstd.dll` / `libzstd.so` / `libzstd.dylib` and drop it in. No build step needed.
+### Option 1: Download pre-built (easiest)
 
-To build from source:
+Grab your platform's binary from [Releases](https://github.com/GodlessVVanderer/zyzyr/releases):
+
+| Platform | File | Where to put it |
+|----------|------|----------------|
+| Windows | `zstd.dll` | Next to the .exe, or in your library path |
+| Linux | `libzstd.so` | `/usr/local/lib/` or `LD_LIBRARY_PATH` |
+| macOS x86 | `libzstd-x86_64.dylib` | Rename to `libzstd.dylib`, place in `DYLD_LIBRARY_PATH` |
+| macOS ARM | `libzstd-aarch64.dylib` | Rename to `libzstd.dylib`, place in `DYLD_LIBRARY_PATH` |
+
+### Option 2: Build from source
 
 ```
-# Linux / macOS
-./build-dropin.sh
+# Linux / macOS — shared lib (default), static, or both:
+./build-dropin.sh              # shared (.so / .dylib)
+./build-dropin.sh --static     # static (.a)
+./build-dropin.sh --both
 
-# Windows
-.\build-dropin.ps1
+# Windows PowerShell:
+.\build-dropin.ps1                    # shared (.dll)
+.\build-dropin.ps1 -Mode static      # static (.lib)
+.\build-dropin.ps1 -Mode both
 ```
 
-Output lands in `target/release/` with the correct libzstd name. Any program linked against libzstd for decompression picks up ZyZyR instead. No code changes needed.
+Output lands in `target/release/` already named `libzstd.*` / `zstd.*`. Drop it where your program looks for libzstd. No code changes needed.
 
 ZyZyR also has its own C API (`zyzyr_*` symbols, header at `include/zyzyr.h`) with the `capi` feature.
 
