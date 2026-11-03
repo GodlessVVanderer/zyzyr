@@ -53,13 +53,19 @@ The `compat` feature provides a complete libzstd-compatible C API. Same function
 - `ZSTD_isError`, `ZSTD_getErrorName`
 - Dictionary support, streaming, parameter setting, context reset
 
-Build as a shared library:
+**Pre-built binaries** are on the [Releases](https://github.com/GodlessVVanderer/zyzyr/releases) page — download `zstd.dll` / `libzstd.so` / `libzstd.dylib` and drop it in. No build step needed.
+
+To build from source:
 
 ```
-cargo rustc --release --features compat --crate-type cdylib
+# Linux / macOS
+./build-dropin.sh
+
+# Windows
+.\build-dropin.ps1
 ```
 
-Name the output `libzstd.so` / `zstd.dll` / `libzstd.dylib`. Any program linked against libzstd for decompression picks up ZyZyR instead. No code changes needed.
+Output lands in `target/release/` with the correct libzstd name. Any program linked against libzstd for decompression picks up ZyZyR instead. No code changes needed.
 
 ZyZyR also has its own C API (`zyzyr_*` symbols, header at `include/zyzyr.h`) with the `capi` feature.
 
