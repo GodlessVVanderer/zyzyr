@@ -35,6 +35,32 @@
 //!
 //! Frames compressed with a dictionary are decoded with the `*_with_dict` functions and a [`Dictionary`].
 //!
+//! # Performance
+//!
+//! Measured on a Ryzen 7 4800HS (Zen 2, AVX2), median of 5 runs. Both decompressors read the same
+//! zstd-compressed buffer. Throughput is decompressed output in MB/s.
+//!
+//! | Data | Size | Level | zyzyr MB/s | libzstd MB/s | Speedup |
+//! |------|------|-------|-----------:|-------------:|--------:|
+//! | text | 1 MB | 1 | 13,495 | 4,317 | 3.1x |
+//! | text | 1 MB | 19 | 10,102 | 3,123 | 3.2x |
+//! | binary | 1 MB | 1 | 33,394 | 4,713 | 7.1x |
+//! | binary | 1 MB | 19 | 42,974 | 5,551 | 7.7x |
+//! | text | 4 MB | 1 | 11,987 | 4,292 | 2.8x |
+//! | text | 4 MB | 19 | 7,321 | 3,148 | 2.3x |
+//! | text | 16 MB | 1 | 7,505 | 4,354 | 1.7x |
+//! | text | 16 MB | 19 | 7,535 | 3,730 | 2.0x |
+//! | text | 64 MB | 1 | 7,957 | 4,204 | 1.9x |
+//! | text | 64 MB | 19 | 7,963 | 4,100 | 1.9x |
+//! | text | 256 MB | 1 | 5,761 | 2,424 | 2.4x |
+//! | text | 256 MB | 3 | 4,357 | 2,508 | 1.7x |
+//! | text | 256 MB | 19 | 7,729 | 4,123 | 1.9x |
+//! | binary | 256 MB | 1 | 7,842 | 5,204 | 1.5x |
+//! | binary | 256 MB | 19 | 7,378 | 4,966 | 1.5x |
+//!
+//! Small incompressible data shows the highest ratio because stored blocks take a fast path that is
+//! essentially a bounds-checked copy. Reproduce with `cargo run --release --example vs_libzstd -- 5`.
+//!
 //! # Features
 //!
 //! - `std` (default): links the standard library. Disable it for `no_std` targets.
