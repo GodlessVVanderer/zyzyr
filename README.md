@@ -82,6 +82,25 @@ Output lands in `target/release/` already named `libzstd.*` / `zstd.*`. Drop it 
 
 ZyZyR also has its own C API (`zyzyr_*` symbols, header at `include/zyzyr.h`) with the `capi` feature.
 
+## Firmware and embedded
+
+Builds on bare-metal and firmware targets with `--no-default-features` (disables `std`, keeps `no_std` + `alloc`):
+
+| Target | Arch | rlib size |
+|--------|------|-----------|
+| `wasm32-unknown-unknown` | WASM | 76 KB |
+| `x86_64-unknown-uefi` | UEFI | 99 KB |
+| `riscv32imc-unknown-none-elf` | RISC-V 32 | 104 KB |
+| `thumbv7em-none-eabihf` | ARM Cortex-M | 109 KB |
+| `aarch64-unknown-none` | ARM64 bare | — |
+
+All targets use the same source. On x86_64 with SSE2, runtime CPU detection picks AVX2 and BMI2 paths. On everything else, the scalar path runs — still register-mapped, still fast.
+
+```toml
+[dependencies]
+zyzyr = { version = "0.1", default-features = false }
+```
+
 ## How it works
 
 Every hot loop maps its working state to named registers and lanes so the compiler emits the same machine code that hand-written intrinsics would. The Huffman decoder, FSE decoder, and sequence executor are all written this way. No lookup tables where register work is faster, no abstraction layers between the algorithm and the machine.

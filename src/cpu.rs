@@ -2,7 +2,7 @@
 pub(crate) struct Cpu {
     #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
     pub(crate) bmi2: bool,
-    #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
+    #[cfg_attr(not(all(target_arch = "x86_64", target_feature = "sse2")), allow(dead_code))]
     pub(crate) avx2: bool,
 }
 

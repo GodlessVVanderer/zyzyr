@@ -1,6 +1,34 @@
 use alloc::boxed::Box;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering::Relaxed};
+use core::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use core::{ptr, slice};
+
+#[cfg(target_has_atomic = "64")]
+use core::sync::atomic::AtomicU64;
+
+#[cfg(not(target_has_atomic = "64"))]
+mod atomic_u64_compat {
+    use core::cell::UnsafeCell;
+
+    #[repr(transparent)]
+    pub struct AtomicU64(UnsafeCell<u64>);
+
+    unsafe impl Sync for AtomicU64 {}
+
+    impl AtomicU64 {
+        #[inline(always)]
+        pub fn load(&self, _: core::sync::atomic::Ordering) -> u64 {
+            unsafe { core::ptr::read_volatile(self.0.get()) }
+        }
+
+        #[inline(always)]
+        pub fn store(&self, v: u64, _: core::sync::atomic::Ordering) {
+            unsafe { core::ptr::write_volatile(self.0.get(), v) }
+        }
+    }
+}
+
+#[cfg(not(target_has_atomic = "64"))]
+use atomic_u64_compat::AtomicU64;
 
 use crate::bits::Back;
 use crate::cpu::multiversion;

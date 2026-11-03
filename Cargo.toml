@@ -5,7 +5,6 @@ edition = "2021"
 license = "AGPL-3.0-only"
 description = "ZYZYR: a Zstandard (RFC 8878) decompressor in pure Rust with no dependencies; no_std + alloc core, optional C API."
 repository = "https://github.com/GodlessVVanderer/zyzyr"
-readme = "README.md"
 keywords = ["zstd", "zstandard", "compression", "decompression", "no-std"]
 categories = ["compression", "no-std"]
 publish = true

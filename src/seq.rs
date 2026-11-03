@@ -614,7 +614,7 @@ unsafe fn dict_plain(sp: &Span, o: *mut u8, offset: usize, ml: usize) -> DictOut
 }
 
 /// `dict_match` with 32-byte pieces.
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
 #[cold]
 #[inline(never)]
 #[target_feature(enable = "avx2")]
@@ -769,7 +769,7 @@ unsafe fn literals<M: Mover>(o: *mut u8, l: *const u8, ll: usize) {
 }
 
 /// `PAT32[o][i] = i % o`: the byte picks that spread an `o`-byte period (o < 16) over 32 bytes.
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
 static PAT32: [[u8; 32]; 16] = {
     let mut t = [[0u8; 32]; 16];
     let mut o = 1;
@@ -785,7 +785,7 @@ static PAT32: [[u8; 32]; 16] = {
 };
 
 /// `STRIDE32[o] = 32 - 32 % o`: the largest multiple of the period `o` that fits in 32 bytes (no divide per match).
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
 static STRIDE32: [u8; 16] = {
     let mut t = [32u8; 16];
     let mut o = 1;
@@ -803,7 +803,7 @@ static STRIDE32: [u8; 16] = {
 /// # Safety
 /// As `short_match`; stores may run up to 31 bytes past `dst + len` (the callers' output slack, as
 /// `spread`).
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
 #[inline(never)]
 unsafe fn short_match_wide(dst: *mut u8, offset: usize, len: usize) {
     use core::arch::x86_64::{
@@ -856,10 +856,10 @@ impl Mover for Narrow {
     }
 }
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
 struct Wide;
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
 impl Mover for Wide {
     #[inline(always)]
     unsafe fn short(dst: *mut u8, offset: usize, len: usize) {
@@ -915,7 +915,7 @@ unsafe fn failed(st: *mut SeqState) -> Result<(), Error> {
 /// Executes the sequence in `span.seq` at the span's literal and output positions.
 #[inline(always)]
 unsafe fn run(st: *mut SeqState) -> bool {
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
     if unsafe { (*st).span.cpu.avx2 } {
         #[target_feature(enable = "avx2")]
         #[inline(never)]
@@ -1152,7 +1152,7 @@ unsafe fn fused_impl<M: Mover, const EDGE: bool>(st: *mut SeqState) -> u32 {
 
 #[inline(always)]
 unsafe fn fused(st: *mut SeqState) -> u32 {
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
     {
         let cpu = unsafe { (*st).span.cpu };
         if cpu.bmi2 && cpu.avx2 {
@@ -1409,7 +1409,7 @@ mod tests {
                 unsafe { copy_free::<Narrow>(src.as_ptr().add(s), dst.as_mut_ptr().add(d), n) };
                 assert_eq!(&dst[d..d + n], &src[s..s + n], "n {n}");
                 assert!(dst[..d].iter().chain(&dst[d + n..]).all(|&b| b == 0xEE), "n {n} wrote outside");
-                #[cfg(target_arch = "x86_64")]
+                #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
                 if Cpu::detect().avx2 {
                     #[target_feature(enable = "avx2")]
                     unsafe fn wide(src: *const u8, dst: *mut u8, n: usize) {

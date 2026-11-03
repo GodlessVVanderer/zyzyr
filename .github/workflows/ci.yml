@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test
+
+  firmware:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: wasm32-unknown-unknown
+            features: "--no-default-features"
+          - target: thumbv7em-none-eabihf
+            features: "--no-default-features"
+          - target: riscv32imc-unknown-none-elf
+            features: "--no-default-features"
+          - target: x86_64-unknown-uefi
+            features: "--no-default-features"
+          - target: aarch64-unknown-none
+            features: "--no-default-features"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - run: cargo check --target ${{ matrix.target }} ${{ matrix.features }}
