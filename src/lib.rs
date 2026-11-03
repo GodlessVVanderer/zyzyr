@@ -1,3 +1,46 @@
+//! A Zstandard (RFC 8878) decompressor in pure Rust, with no dependencies.
+//!
+//! The core is `no_std` and needs only `alloc`. It picks the fastest code path for the CPU at runtime,
+//! and an optional C API (feature `capi`) and libzstd-compatible API (feature `compat`) are available.
+//!
+//! # One-shot decoding
+//!
+//! ```
+//! # let compressed = zstd::encode_all(&b"hello, zstd"[..], 3).unwrap();
+//! let data = zyzyr::decompress(&compressed)?;
+//! assert_eq!(data, b"hello, zstd");
+//! # Ok::<(), zyzyr::Error>(())
+//! ```
+//!
+//! # Reusing a decoder
+//!
+//! A [`Decoder`] keeps its working memory between calls, which is faster when decoding many frames.
+//! [`Decoder::decompress_into`] appends to an existing vector.
+//!
+//! ```
+//! # let compressed = zstd::encode_all(&b"hello, zstd"[..], 3).unwrap();
+//! let mut decoder = zyzyr::Decoder::new();
+//! let mut out = Vec::new();
+//! let n = decoder.decompress_into(&compressed, &mut out)?;
+//! assert_eq!(&out[..n], b"hello, zstd");
+//! # Ok::<(), zyzyr::Error>(())
+//! ```
+//!
+//! # Streaming
+//!
+//! A [`StreamDecoder`] takes input in pieces of any size and gives back decoded bytes as they are ready,
+//! with memory bounded by the frame's window.
+//!
+//! # Dictionaries
+//!
+//! Frames compressed with a dictionary are decoded with the `*_with_dict` functions and a [`Dictionary`].
+//!
+//! # Features
+//!
+//! - `std` (default): links the standard library. Disable it for `no_std` targets.
+//! - `capi`: a C API, with the header in `include/zyzyr.h`.
+//! - `compat`: a drop-in libzstd-compatible C API (`ZSTD_decompress`, `ZSTD_decompressStream`, ...).
+
 #![no_std]
 
 extern crate alloc;
@@ -37,6 +80,7 @@ const DICT_MAGIC: u32 = 0xEC30_A437;
 const BLOCK_MAX: usize = 128 * 1024;
 pub(crate) const SLACK: usize = 32;
 
+/// Why decoding failed. [`Error::text`] and `Display` give a short description.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     Truncated,
@@ -57,6 +101,7 @@ pub enum Error {
 }
 
 impl Error {
+    /// A short description of the error, as a C string so the C API can return it directly.
     pub const fn text(self) -> &'static CStr {
         match self {
             Error::Truncated => c"input ends before the data it describes",
@@ -244,6 +289,9 @@ impl Ctx {
     }
 }
 
+/// A Zstandard dictionary, parsed once and shared by any number of decodes.
+///
+/// Accepts both formatted dictionaries (from `zstd --train`) and raw content dictionaries.
 pub struct Dictionary {
     id: u32,
     content: Vec<u8>,
@@ -252,6 +300,7 @@ pub struct Dictionary {
 }
 
 impl Dictionary {
+    /// Parses a dictionary from its bytes.
     pub fn new(bytes: &[u8]) -> Result<Dictionary, Error> {
         let mut r = MaybeUninit::uninit();
         Dictionary::make(&mut r, bytes);
@@ -366,6 +415,7 @@ impl Dictionary {
         unsafe { &mut *ptr::read((&raw const d.huf).cast::<*mut HufTable>()) }
     }
 
+    /// The dictionary id, matched against the id in a frame header (see [`dictionary_id`]).
     pub fn id(&self) -> u32 {
         self.id
     }
@@ -392,18 +442,24 @@ unsafe fn buffer(n: usize, again: impl FnOnce() -> usize) -> *mut u8 {
     }
 }
 
+/// Decompresses every frame in `input` into a new vector.
+///
+/// Concatenated frames decode as one sequence, and skippable frames are skipped.
 pub fn decompress(input: &[u8]) -> Result<Vec<u8>, Error> {
     owned(input, None)
 }
 
+/// Decompresses every frame in `input`, appending to `out`. Returns the number of bytes appended.
 pub fn decompress_into(input: &[u8], out: &mut Vec<u8>) -> Result<usize, Error> {
     once(input, None, out)
 }
 
+/// [`decompress`] for frames compressed with a dictionary.
 pub fn decompress_with_dict(input: &[u8], dict: &Dictionary) -> Result<Vec<u8>, Error> {
     owned(input, Some(dict))
 }
 
+/// [`decompress_into`] for frames compressed with a dictionary.
 pub fn decompress_into_with_dict(input: &[u8], dict: &Dictionary, out: &mut Vec<u8>) -> Result<usize, Error> {
     once(input, Some(dict), out)
 }
@@ -440,6 +496,8 @@ fn once(input: &[u8], dict: Option<&Dictionary>, out: &mut Vec<u8>) -> Result<us
     }
 }
 
+/// A reusable decoder. It keeps its working memory between calls, so decoding many frames with one
+/// `Decoder` is faster than calling [`decompress`] each time.
 pub struct Decoder {
     ctx: Option<Ctx>,
     cpu: Cpu,
@@ -452,6 +510,7 @@ impl Default for Decoder {
 }
 
 impl Decoder {
+    /// A new decoder, using the fastest code path this CPU supports.
     pub fn new() -> Self {
         Decoder::on(Cpu::detect())
     }
@@ -460,18 +519,22 @@ impl Decoder {
         Decoder { ctx: None, cpu }
     }
 
+    /// Decompresses every frame in `input` into a new vector.
     pub fn decompress(&mut self, input: &[u8]) -> Result<Vec<u8>, Error> {
         self.guarded_vec(input, None)
     }
 
+    /// Decompresses every frame in `input`, appending to `out`. Returns the number of bytes appended.
     pub fn decompress_into(&mut self, input: &[u8], out: &mut Vec<u8>) -> Result<usize, Error> {
         self.guarded(input, None, out)
     }
 
+    /// [`Decoder::decompress`] for frames compressed with a dictionary.
     pub fn decompress_with_dict(&mut self, input: &[u8], dict: &Dictionary) -> Result<Vec<u8>, Error> {
         self.guarded_vec(input, Some(dict))
     }
 
+    /// [`Decoder::decompress_into`] for frames compressed with a dictionary.
     pub fn decompress_into_with_dict(&mut self, input: &[u8], dict: &Dictionary, out: &mut Vec<u8>) -> Result<usize, Error> {
         self.guarded(input, Some(dict), out)
     }

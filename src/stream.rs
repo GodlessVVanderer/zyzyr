@@ -100,9 +100,14 @@ struct Feed {
     dict: usize,
 }
 
-/// `repr(C)` in the field order the decoder had before the header and context fields were added (those
-/// last), so the fields every feed touches (phase, feed block, `need`, `wp`, `lo`) stay at their offsets,
-/// together in 72 bytes.
+/// A streaming decoder: feed it input in pieces of any size and read decoded bytes as they become ready.
+///
+/// Call [`feed`](Self::feed) with the next input, take output with [`pending`](Self::pending) and
+/// [`consume`](Self::consume) (or [`drain`](Self::drain)), and call [`finish`](Self::finish) at the end
+/// of the input to confirm the last frame was complete.
+// `repr(C)` in the field order the decoder had before the header and context fields were added (those
+// last), so the fields every feed touches (phase, feed block, `need`, `wp`, `lo`) stay at their offsets,
+// together in 72 bytes.
 #[repr(C)]
 pub struct StreamDecoder {
     ext: Option<(usize, usize)>,
@@ -142,6 +147,7 @@ impl Default for StreamDecoder {
 }
 
 impl StreamDecoder {
+    /// A new stream decoder, using the fastest code path this CPU supports.
     pub fn new() -> Self {
         StreamDecoder::on(Cpu::detect())
     }
@@ -150,6 +156,7 @@ impl StreamDecoder {
         StreamDecoder { feed: Feed::default(), hb: [0; 16], head: MaybeUninit::uninit(), ctx: MaybeUninit::uninit(), made: false, cpu, phase: Phase::Magic, need: 4, fill: 0, inb: Vec::new(), frame: None, win: Vec::new(), wp: 0, lo: 0, ext: None, skip: 0 }
     }
 
+    /// Discards any partial frame and pending output, ready for a new stream.
     pub fn reset(&mut self) {
         self.phase = Phase::Magic;
         self.need = 4;
@@ -161,22 +168,28 @@ impl StreamDecoder {
         self.skip = 0;
     }
 
+    /// Feeds input to the decoder. Returns how many bytes of `input` were taken; feed the rest again
+    /// after taking the pending output.
     pub fn feed(&mut self, input: &[u8]) -> Result<usize, Error> {
         self.feed_inner(input, None)
     }
 
+    /// [`feed`](Self::feed) for frames compressed with a dictionary.
     pub fn feed_with_dict(&mut self, input: &[u8], dict: &Dictionary) -> Result<usize, Error> {
         self.feed_inner(input, Some(dict))
     }
 
+    /// Decoded bytes ready to be read. Mark them read with [`consume`](Self::consume).
     pub fn pending(&self) -> &[u8] {
         &self.win[self.lo..self.wp]
     }
 
+    /// Marks `n` bytes of [`pending`](Self::pending) as read.
     pub fn consume(&mut self, n: usize) {
         self.lo += n.min(self.wp - self.lo);
     }
 
+    /// Copies pending output into `out` and marks it read. Returns the number of bytes copied.
     pub fn drain(&mut self, out: &mut [u8]) -> usize {
         let n = out.len().min(self.wp - self.lo);
         out[..n].copy_from_slice(&self.win[self.lo..self.lo + n]);
@@ -184,10 +197,12 @@ impl StreamDecoder {
         n
     }
 
+    /// True when no frame is partly decoded and all output has been read.
     pub fn at_frame_boundary(&self) -> bool {
         self.phase == Phase::Magic && self.inb.is_empty() && self.lo == self.wp
     }
 
+    /// Checks the end of the input: an error if a frame is incomplete or decoding failed.
     pub fn finish(&self) -> Result<(), Error> {
         match self.phase {
             Phase::Failed(e) => Err(e),
@@ -196,6 +211,7 @@ impl StreamDecoder {
         }
     }
 
+    /// How many more input bytes the decoder needs to make progress (0 when it needs none).
     pub fn input_hint(&self) -> usize {
         match self.phase {
             Phase::Magic if self.inb.is_empty() => 0,
@@ -205,6 +221,7 @@ impl StreamDecoder {
         }
     }
 
+    /// Bytes of buffer memory the decoder currently holds.
     pub fn memory(&self) -> usize {
         self.win.capacity() + self.inb.capacity()
     }
