@@ -8,17 +8,23 @@ Measured on Ryzen 7 4800HS (Zen 2, AVX2), median of 5 runs. Both decompressors r
 
 | Data | Size | Level | ZyZyR MB/s | libzstd MB/s | Speedup |
 |------|------|-------|-----------|-------------|---------|
-| text | 1 MB | 1 | 10,766 | 2,901 | **3.7x** |
-| text | 1 MB | 19 | 11,348 | 3,380 | **3.4x** |
-| binary | 1 MB | 1 | 45,197 | 3,705 | **12.2x** |
-| binary | 1 MB | 19 | 39,719 | 3,779 | **10.5x** |
-| text | 16 MB | 1 | 4,164 | 1,730 | **2.4x** |
-| text | 64 MB | 19 | 7,292 | 3,602 | **2.0x** |
-| text | 256 MB | 1 | 6,872 | 3,692 | **1.9x** |
-| text | 256 MB | 19 | 7,922 | 3,861 | **2.1x** |
-| binary | 256 MB | 19 | 6,959 | 3,107 | **2.2x** |
+| text | 1 MB | 1 | 13,495 | 4,317 | **3.1x** |
+| text | 1 MB | 19 | 10,102 | 3,123 | **3.2x** |
+| binary | 1 MB | 1 | 33,394 | 4,713 | **7.1x** |
+| binary | 1 MB | 19 | 42,974 | 5,551 | **7.7x** |
+| text | 4 MB | 1 | 11,987 | 4,292 | **2.8x** |
+| text | 4 MB | 19 | 7,321 | 3,148 | **2.3x** |
+| text | 16 MB | 1 | 7,505 | 4,354 | **1.7x** |
+| text | 16 MB | 19 | 7,535 | 3,730 | **2.0x** |
+| text | 64 MB | 1 | 7,957 | 4,204 | **1.9x** |
+| text | 64 MB | 19 | 7,963 | 4,100 | **1.9x** |
+| text | 256 MB | 1 | 5,761 | 2,424 | **2.4x** |
+| text | 256 MB | 3 | 4,357 | 2,508 | **1.7x** |
+| text | 256 MB | 19 | 7,729 | 4,123 | **1.9x** |
+| binary | 256 MB | 1 | 7,842 | 5,204 | **1.5x** |
+| binary | 256 MB | 19 | 7,378 | 4,966 | **1.5x** |
 
-Small incompressible data shows the highest ratio because the fast path for stored blocks is essentially a bounds-checked memcpy. At 256 MB where cache misses dominate, ZyZyR holds 1.9-2.2x.
+Small incompressible data shows the highest ratio because the fast path for stored blocks is essentially a bounds-checked memcpy. At 256 MB where cache pressure dominates, ZyZyR holds 1.5-2.4x.
 
 Run the benchmark yourself:
 
@@ -39,7 +45,7 @@ For `no_std` environments, disable the default `std` feature:
 
 ```toml
 [dependencies]
-zyzyr = { version = "0.1", default-features = false }
+zyzyr = { version = "0.2", default-features = false }
 ```
 
 ## Drop-in libzstd replacement
@@ -98,7 +104,7 @@ All targets use the same source. On x86_64 with SSE2, runtime CPU detection pick
 
 ```toml
 [dependencies]
-zyzyr = { version = "0.1", default-features = false }
+zyzyr = { version = "0.2", default-features = false }
 ```
 
 ## How it works
